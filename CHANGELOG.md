@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.0.0 — 2026-07-08
+
+Changed alignment from per-transaction to file-wide.
+
+- The account field is now padded past the longest account name in the whole
+  file, and every first-amount number is right-aligned to a single shared
+  column across all transactions (previously each transaction was aligned
+  independently). `@`/`@@` costs and `=` assertions still trail the aligned
+  amount with single-space separators.
+- Output of multi-transaction files changes accordingly; single-transaction
+  files are unaffected. Still whitespace-only: `hledger print` is unchanged.
+
 ## 0.1.0.2 — 2026-07-07
 
 - Report a clean error and exit non-zero when a file cannot be read or

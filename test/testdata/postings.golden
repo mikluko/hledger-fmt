@@ -9,5 +9,5 @@ P 2025-01-01 USD 1.00 EUR
     Equity:X:Corrections
 
 2025-02-02 groceries  ; trailing header comment
-    Expenses:Food   12.50 USD
-    Assets:Cash    -12.50 USD
+    Expenses:Food                         12.50 USD
+    Assets:Cash                          -12.50 USD

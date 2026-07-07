@@ -10,5 +10,5 @@ include prices/2025.ledger
 P 2025-06-01 USD 0.93 EUR
 
 2025/03/03 payee
-    Assets:Bank  100 USD
+    Assets:Bank    100 USD
     Expenses:Misc

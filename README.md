@@ -44,20 +44,23 @@ hledger-fmt $(git ls-files '*.ledger' '*.journal')
 
 ## What it does
 
-Applied per transaction block:
+Alignment is computed once over the whole file, so amounts line up in a
+single column across every transaction:
 
 1. Posting indent normalized to 4 spaces.
 2. Account and amount are separated by a run of two or more spaces (hledger's
    rule; account names may contain single spaces).
-3. The first amount's number is right-aligned to a common column across the
-   block, then one space, then the commodity. A trailing `@`/`@@` cost and
-   `= assertion` follow with single-space separators and are not
-   column-aligned:
+3. The account field is padded past the longest account name in the file, then
+   the first amount's number is right-aligned to one shared column, then one
+   space, then the commodity. A trailing `@`/`@@` cost and `= assertion`
+   follow with single-space separators and are not column-aligned:
 
    ```ledger
-       Equity:Accumulated:2025:Earned   -552799.00 AMD @ 0.002622 USD
-       Equity:Accumulated:2025:Earned    -14228.87 EUR @ 1.174619 USD
-       Equity:Accumulated:2025:Earned  -7485978.18 RSD @ 0.010013 USD
+       A:B                          10.00 USD
+       C:D                         -10.00 USD
+
+       Expenses:Groceries:Weekly   100.00 EUR @ 1.20 USD
+       Assets:Bank:Checking       -120.00 USD
    ```
 
 4. Amount-less postings (the implicit balancing leg) get the account only,

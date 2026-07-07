@@ -5,6 +5,10 @@
 -- through (directives and comments verbatim, transaction headers with
 -- trailing whitespace trimmed). Because directives pass through untouched,
 -- price-only and include-only files are safe by construction.
+--
+-- Amounts are aligned to a single file-wide column: the account field is
+-- padded past the longest account name in the file, and every first-amount
+-- number is right-aligned to one shared column across all transactions.
 module Hledger.Fmt (
     format,
     isFormatted,
@@ -26,20 +30,43 @@ isFormatted s = format s == s
 -- Line dispatch
 -- ---------------------------------------------------------------------------
 
--- | Reflow a list of physical lines. An indented, non-blank run is treated as
--- a posting group (amount column computed jointly) only when it follows a
--- transaction header; otherwise it passes through verbatim, so indented
--- sub-directives under @account@/@commodity@ are left untouched. Every
--- non-posting line is emitted by 'formatOther'.
+-- | Reflow a list of physical lines. Alignment widths are computed once over
+-- every posting in the file (first pass), then each posting run is rendered
+-- against those shared widths. An indented, non-blank run counts as postings
+-- only when it follows a transaction header; otherwise it passes through
+-- verbatim, so indented sub-directives under @account@/@commodity@ are left
+-- untouched. Every non-posting line is emitted by 'formatOther'.
 formatLines :: [String] -> [String]
-formatLines = go False
+formatLines ls = go False ls
   where
-    go inTxn (l : ls)
+    posts = map parsePosting (concat (postingRuns ls))
+    accW = maximum0 [length a | Just a <- map accountOf posts]
+    numW = maximum0 [length n | PAmount _ n _ _ _ <- posts]
+
+    go inTxn (l : rest)
         | inTxn && isIndentedNonBlank l =
-            let (grp, rest) = span isIndentedNonBlank (l : ls)
-             in formatGroup grp ++ go True rest
-        | otherwise = formatOther l : go (opensTxn l) ls
+            let (grp, more) = span isIndentedNonBlank (l : rest)
+             in map (render accW numW . parsePosting) grp ++ go True more
+        | otherwise = formatOther l : go (opensTxn l) rest
     go _ [] = []
+
+-- | The maximal runs of posting lines in the file: indented, non-blank lines
+-- that follow a transaction header.
+postingRuns :: [String] -> [[String]]
+postingRuns = go False
+  where
+    go inTxn (l : rest)
+        | inTxn && isIndentedNonBlank l =
+            let (grp, more) = span isIndentedNonBlank (l : rest)
+             in grp : go True more
+        | otherwise = go (opensTxn l) rest
+    go _ [] = []
+
+-- | The account name of a posting that has one (comment lines have none).
+accountOf :: Posting -> Maybe String
+accountOf (PAmount a _ _ _ _) = Just a
+accountOf (PBare a _) = Just a
+accountOf (PComment _) = Nothing
 
 -- | Whether a line opens a transaction, so a following indented run is
 -- postings. A blank line or a directive ends the transaction.
@@ -77,15 +104,6 @@ data Posting
       PBare String (Maybe String)
     | -- | account, number field, commodity, cost/assertion tokens, comment.
       PAmount String String String [String] (Maybe String)
-
--- | Reflow one posting group, aligning the first amount's number to a common
--- column across the amount-bearing postings.
-formatGroup :: [String] -> [String]
-formatGroup ls =
-    let ps = map parsePosting ls
-        accW = maximum0 [length a | PAmount a _ _ _ _ <- ps]
-        numW = maximum0 [length n | PAmount _ n _ _ _ <- ps]
-     in map (render accW numW) ps
 
 maximum0 :: [Int] -> Int
 maximum0 [] = 0
