@@ -1,0 +1,9 @@
+.*
+!.gitignore
+!.github/
+!.hlint.yaml
+dist-newstyle/
+.ghc.environment.*
+*.hi
+*.o
+cabal.project.local*

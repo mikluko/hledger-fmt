@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: haskell-actions/setup@v2
+        id: setup
+        with:
+          ghc-version: "9.12.2"
+          cabal-version: "3.16.1.0"
+
+      - name: Configure
+        run: cabal configure --enable-tests
+
+      - name: Compute dependency plan
+        run: cabal build --dry-run
+
+      - name: Restore dependency cache
+        uses: actions/cache/restore@v6
+        id: cache
+        with:
+          path: ${{ steps.setup.outputs.cabal-store }}
+          key: deps-${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-${{ hashFiles('dist-newstyle/cache/plan.json') }}
+          restore-keys: deps-${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-
+
+      - name: Build dependencies
+        run: cabal build all --only-dependencies
+
+      - name: Save dependency cache
+        uses: actions/cache/save@v6
+        if: steps.cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ steps.setup.outputs.cabal-store }}
+          key: ${{ steps.cache.outputs.cache-primary-key }}
+
+      - name: Build
+        run: cabal build all
+
+      - name: Test
+        run: cabal test all --test-show-details=direct
+
+      - name: Install hledger for the semantic invariant
+        run: sudo apt-get update && sudo apt-get install -y hledger
+
+      - name: Semantic invariant (hledger print unchanged)
+        run: make test-semantic
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up hlint
+        # SHA-pinned to unreleased node24 commit; move back to a version tag once v2.4.11+ is released
+        uses: haskell-actions/hlint-setup@8887da9acdd3617d08f9e3380197162670ce3e57
+        with:
+          version: "3.10"
+
+      - name: hlint
+        # SHA-pinned to unreleased node24 commit; move back to a version tag once v2.4.11+ is released
+        uses: haskell-actions/hlint-run@73321785d134854dd302a7068a5f926aa24f63bf
+        with:
+          path: '["src/", "app/", "test/"]'
+          fail-on: warning
+
+      - name: fourmolu
+        uses: haskell-actions/run-fourmolu@v13
+        with:
+          version: "0.20.0.0"
+          pattern: |
+            src/**/*.hs
+            app/**/*.hs
+            test/**/*.hs

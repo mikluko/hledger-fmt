@@ -1,0 +1,63 @@
+cabal-version:      3.0
+name:               hledger-fmt
+version:            0.1.0.0
+synopsis:           hledger add-on: format-preserving journal formatter
+description:
+    Aligns posting columns in hledger journals while touching only
+    whitespace. Unlike @hledger print@ it is not lossy: directives,
+    top-level comments, @include@ lines, @P@ price directives, and
+    blank-line grouping pass through byte-for-byte, and numbers are never
+    restyled. The library and executable depend on @base@ only, so the
+    tool builds with the GHC toolchain already present wherever hledger is.
+license:            MIT
+license-file:       LICENSE
+author:             Mikhail Lukianchenko
+maintainer:         ml@akabos.com
+category:           Finance
+build-type:         Simple
+homepage:           https://github.com/mikluko/hledger-fmt
+bug-reports:        https://github.com/mikluko/hledger-fmt/issues
+extra-doc-files:
+    CHANGELOG.md
+    README.md
+tested-with:        GHC ==9.12.2 || ==9.14.1
+
+source-repository head
+    type:     git
+    location: https://github.com/mikluko/hledger-fmt
+
+common warnings
+    ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates
+                 -Wincomplete-uni-patterns -Wmissing-export-lists
+                 -Wredundant-constraints
+
+library
+    import:           warnings
+    hs-source-dirs:   src
+    exposed-modules:  Hledger.Fmt
+    build-depends:    base >=4.20 && <5
+    default-language: GHC2021
+
+executable hledger-fmt
+    import:           warnings
+    hs-source-dirs:   app
+    main-is:          Main.hs
+    build-depends:
+        base,
+        hledger-fmt
+    default-language: GHC2021
+
+test-suite hledger-fmt-test
+    import:           warnings
+    type:             exitcode-stdio-1.0
+    hs-source-dirs:   test
+    main-is:          Spec.hs
+    build-depends:
+        base,
+        bytestring,
+        filepath,
+        hledger-fmt,
+        tasty,
+        tasty-golden,
+        tasty-hunit
+    default-language: GHC2021
