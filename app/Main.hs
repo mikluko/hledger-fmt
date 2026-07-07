@@ -9,6 +9,7 @@
 -- already formatted. With @-@ or no operands, stdin is formatted to stdout.
 module Main (main) where
 
+import Control.Exception (IOException, try)
 import Control.Monad (forM, forM_, unless, when)
 import System.Environment (getArgs)
 import System.Exit (ExitCode (ExitFailure), exitFailure, exitSuccess, exitWith)
@@ -32,7 +33,7 @@ import System.IO (
 import Hledger.Fmt (format, isFormatted)
 
 version :: String
-version = "hledger-fmt 0.1.0.1"
+version = "hledger-fmt 0.1.0.2"
 
 usage :: String
 usage =
@@ -74,7 +75,7 @@ main = do
             ["-"] -> runStdin check
             _
                 | check -> runCheck files
-                | otherwise -> mapM_ formatInPlace files
+                | otherwise -> runFormat files
 
 -- | Options may appear anywhere; @-@ and non-flag words are file operands.
 -- Any other @-@-prefixed word is an unknown option.
@@ -98,24 +99,39 @@ runStdin check = do
         then unless (isFormatted src) exitFailure
         else putStr (format src)
 
-formatInPlace :: FilePath -> IO ()
-formatInPlace path = do
-    src <- readFileUtf8 path
-    let out = format src
-    when (out /= src) $ writeFileUtf8 path out
+-- | Format each file in place. A file that cannot be read or written is
+-- reported on stderr and skipped; the run then exits non-zero.
+runFormat :: [FilePath] -> IO ()
+runFormat files = do
+    oks <- forM files $ \path ->
+        onFile path $ \src -> do
+            let out = format src
+            when (out /= src) $ writeFileUtf8 path out
+            pure True
+    unless (and oks) exitFailure
 
--- | Write nothing; exit non-zero if any file is not already formatted,
--- listing offenders on stderr.
+-- | Write nothing; exit non-zero if any file is not already formatted (listing
+-- offenders on stderr) or cannot be read.
 runCheck :: [FilePath] -> IO ()
 runCheck files = do
-    offenders <- fmap concat . forM files $ \path -> do
-        src <- readFileUtf8 path
-        pure [path | not (isFormatted src)]
-    if null offenders
-        then exitSuccess
-        else do
-            forM_ offenders $ \p -> hPutStrLn stderr ("unformatted: " ++ p)
-            exitFailure
+    oks <- forM files $ \path ->
+        onFile path $ \src ->
+            if isFormatted src
+                then pure True
+                else hPutStrLn stderr ("unformatted: " ++ path) >> pure False
+    unless (and oks) exitFailure
+
+-- | Read a file and run an action on its contents, turning any IO error into a
+-- stderr message and a 'False' result instead of an uncaught exception. The
+-- action's own 'Bool' (e.g. \"already formatted\") is passed through on success.
+onFile :: FilePath -> (String -> IO Bool) -> IO Bool
+onFile path act = do
+    r <- try (readFileUtf8 path >>= act)
+    case r of
+        Right ok -> pure ok
+        Left e -> do
+            hPutStrLn stderr ("hledger-fmt: " ++ show (e :: IOException))
+            pure False
 
 readFileUtf8 :: FilePath -> IO String
 readFileUtf8 path = openFileUtf8 path ReadMode >>= hGetContents'

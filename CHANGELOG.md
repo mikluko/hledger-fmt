@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0.2 — 2026-07-07
+
+- Report a clean error and exit non-zero when a file cannot be read or
+  written, instead of crashing with an uncaught `openFile` exception (e.g.
+  `hledger fmt missing.ledger`). Remaining files are still processed.
+
 ## 0.1.0.1 — 2026-07-07
 
 - Handle `--help`/`-h` and `--version` instead of treating them as file
