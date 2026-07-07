@@ -116,10 +116,32 @@ render accW numW (PAmount acc num com rest mc) =
     indent
         ++ padR acc accW
         ++ "  "
-        ++ padL num numW
-        ++ (if null com then "" else " " ++ com)
+        ++ amountField
         ++ (if null rest then "" else " " ++ unwords rest)
         ++ commentPart mc
+  where
+    amountField
+        -- Amount-less posting carrying only a cost/assertion tail (@ /
+        -- = ...): reserve the number and commodity columns with blanks so the
+        -- tail lines up as if a zero amount stood in front of it.
+        | null num = replicate numW ' ' ++ phantomCommodityPad rest
+        | otherwise = padL num numW ++ (if null com then "" else " " ++ com)
+
+-- | Blank padding standing in for the commodity of an omitted amount, taken
+-- from the commodity of the cost/assertion tail (empty if it has none).
+phantomCommodityPad :: [String] -> String
+phantomCommodityPad rest = case tailCommodity rest of
+    "" -> ""
+    c -> " " ++ replicate (length c) ' '
+
+-- | The commodity of a cost/assertion tail: the first token that is neither an
+-- operator (@, @@, =, ==) nor a number.
+tailCommodity :: [String] -> String
+tailCommodity (t : ts)
+    | isRestStart t = tailCommodity ts
+    | isNumberLike t = tailCommodity ts
+    | otherwise = t
+tailCommodity [] = ""
 
 indent :: String
 indent = "    "

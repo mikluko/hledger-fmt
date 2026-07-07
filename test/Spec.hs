@@ -11,7 +11,7 @@ import Hledger.Fmt (format, isFormatted)
 -- | Fixtures live as @<name>.in.ledger@ (raw input) and @<name>.golden@
 -- (expected formatted output) under @test/testdata@.
 fixtures :: [String]
-fixtures = ["postings", "directives", "trailing", "multi"]
+fixtures = ["postings", "directives", "trailing", "multi", "assertion"]
 
 testdata :: FilePath
 testdata = "test" </> "testdata"

@@ -33,7 +33,7 @@ import System.IO (
 import Hledger.Fmt (format, isFormatted)
 
 version :: String
-version = "hledger-fmt 0.2.0.0"
+version = "hledger-fmt 0.2.1.0"
 
 usage :: String
 usage =

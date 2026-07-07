@@ -64,7 +64,14 @@ single column across every transaction:
    ```
 
 4. Amount-less postings (the implicit balancing leg) get the account only,
-   trailing whitespace trimmed.
+   trailing whitespace trimmed. If such a posting carries only a balance
+   assertion or cost (e.g. `= 0 RSD`), the amount column is reserved with
+   blanks so the tail lines up as if a zero amount stood in front of it:
+
+   ```ledger
+       Expenses:Unknown
+       Assets:Cash                = 0 RSD
+   ```
 5. Inline posting comments are preserved and normalized to 2 spaces before `;`.
 6. Numbers are never restyled: digit grouping, decimal places, and sign
    spacing are copied through unchanged.

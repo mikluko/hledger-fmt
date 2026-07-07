@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1.0 — 2026-07-08
+
+- An amount-less posting that carries only a balance assertion or cost
+  (e.g. `Assets:Cash    = 0 RSD`) now reserves the number and commodity
+  columns with blanks, so the `= …`/`@ …` tail lines up as if a zero amount
+  stood in front of it, instead of sitting one commodity too far left.
+
 ## 0.2.0.0 — 2026-07-08
 
 Changed alignment from per-transaction to file-wide.
