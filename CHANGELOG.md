@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0.1 — 2026-07-07
+
+- Handle `--help`/`-h` and `--version` instead of treating them as file
+  operands (which crashed with an `openFile` error, notably on
+  `hledger fmt --help`). Unknown `-`-prefixed options now report an error
+  and exit 2 rather than trying to open a file.
+- `--check` with no file operands now checks stdin.
+
 ## 0.1.0.0 — 2026-07-07
 
 Initial release.
