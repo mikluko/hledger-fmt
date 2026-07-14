@@ -38,5 +38,16 @@ for in in "$data"/*.in.ledger; do
         echo "FAIL (print changed): $name" >&2
         status=1
     fi
+
+    # --sort reorders transactions; hledger print sorts by date, so its output
+    # must still be byte-identical to the original.
+    "$fmt" --sort <"$in" >"$tmp/sorted.ledger"
+    hledger print -f "$tmp/sorted.ledger" >"$tmp/sorted"
+    if diff -u "$tmp/before" "$tmp/sorted"; then
+        echo "ok: $name (--sort)"
+    else
+        echo "FAIL (print changed under --sort): $name" >&2
+        status=1
+    fi
 done
 exit "$status"

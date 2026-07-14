@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0.0 — 2026-07-08
+
+- New `--sort` flag: stably sort transactions by date. Sorting is
+  directive-bounded (directives and standalone comment blocks are barriers,
+  so positional directives like `apply account`/`Y`/`alias` keep their
+  scope) and stable (equal dates keep source order). A comment directly
+  above a transaction travels with it. `--check --sort` verifies a file is
+  both aligned and sorted. Default formatting is unchanged (whitespace-only);
+  `hledger print` stays byte-identical either way.
+
 ## 0.2.1.0 — 2026-07-08
 
 - An amount-less posting that carries only a balance assertion or cost

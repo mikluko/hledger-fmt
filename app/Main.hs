@@ -30,33 +30,36 @@ import System.IO (
     utf8,
  )
 
-import Hledger.Fmt (format, isFormatted)
+import Hledger.Fmt (format, formatSorted, isFormatted, isFormattedSorted)
 
 version :: String
-version = "hledger-fmt 0.2.1.0"
+version = "hledger-fmt 0.3.0.0"
 
 usage :: String
 usage =
     unlines
         [ "hledger-fmt: format-preserving hledger journal formatter"
         , ""
-        , "Usage: hledger-fmt [--check] [FILE|-]..."
-        , "or:    hledger fmt -- [--check] [FILE|-]..."
+        , "Usage: hledger-fmt [--check] [--sort] [FILE|-]..."
+        , "or:    hledger fmt -- [--check] [--sort] [FILE|-]..."
         , ""
         , "  FILE...          format each file in place"
         , "  --check FILE...  write nothing; exit non-zero if any file is not"
         , "                   already formatted, listing offenders on stderr"
+        , "  --sort           also sort transactions by date (stable, bounded"
+        , "                   by directives; equal dates keep their order)"
         , "  -, or no args    format stdin to stdout (--check reports via exit code)"
         , ""
         , "  -h, --help       show this help"
         , "      --version    show version"
         ]
 
--- | Parsed command line: either a terminal action, or a run request.
+-- | Parsed command line: either a terminal action, or a run request carrying
+-- the @--check@ and @--sort@ flags.
 data Command
     = Help
     | Version
-    | Run Bool [FilePath]
+    | Run Bool Bool [FilePath]
 
 main :: IO ()
 main = do
@@ -70,53 +73,62 @@ main = do
             exitWith (ExitFailure 2)
         Right Help -> putStr usage
         Right Version -> putStrLn version
-        Right (Run check files) -> case files of
-            [] -> runStdin check
-            ["-"] -> runStdin check
+        Right (Run check sort files) -> case files of
+            [] -> runStdin check sort
+            ["-"] -> runStdin check sort
             _
-                | check -> runCheck files
-                | otherwise -> runFormat files
+                | check -> runCheck sort files
+                | otherwise -> runFormat sort files
 
 -- | Options may appear anywhere; @-@ and non-flag words are file operands.
 -- Any other @-@-prefixed word is an unknown option.
 parseArgs :: [String] -> Either String Command
-parseArgs = go False []
+parseArgs = go False False []
   where
-    go check files (a : as) = case a of
-        "--check" -> go True files as
+    go check sort files (a : as) = case a of
+        "--check" -> go True sort files as
+        "--sort" -> go check True files as
         "-h" -> Right Help
         "--help" -> Right Help
         "--version" -> Right Version
-        "-" -> go check (files ++ ["-"]) as
+        "-" -> go check sort (files ++ ["-"]) as
         ('-' : _) -> Left ("hledger-fmt: unknown option: " ++ a)
-        _ -> go check (files ++ [a]) as
-    go check files [] = Right (Run check files)
+        _ -> go check sort (files ++ [a]) as
+    go check sort files [] = Right (Run check sort files)
 
-runStdin :: Bool -> IO ()
-runStdin check = do
+-- | The transform applied to a file's contents, per @--sort@.
+transform :: Bool -> String -> String
+transform sort = if sort then formatSorted else format
+
+-- | Whether a file's contents are already in final form, per @--sort@.
+formatted :: Bool -> String -> Bool
+formatted sort = if sort then isFormattedSorted else isFormatted
+
+runStdin :: Bool -> Bool -> IO ()
+runStdin check sort = do
     src <- getContents
     if check
-        then unless (isFormatted src) exitFailure
-        else putStr (format src)
+        then unless (formatted sort src) exitFailure
+        else putStr (transform sort src)
 
 -- | Format each file in place. A file that cannot be read or written is
 -- reported on stderr and skipped; the run then exits non-zero.
-runFormat :: [FilePath] -> IO ()
-runFormat files = do
+runFormat :: Bool -> [FilePath] -> IO ()
+runFormat sort files = do
     oks <- forM files $ \path ->
         onFile path $ \src -> do
-            let out = format src
+            let out = transform sort src
             when (out /= src) $ writeFileUtf8 path out
             pure True
     unless (and oks) exitFailure
 
 -- | Write nothing; exit non-zero if any file is not already formatted (listing
 -- offenders on stderr) or cannot be read.
-runCheck :: [FilePath] -> IO ()
-runCheck files = do
+runCheck :: Bool -> [FilePath] -> IO ()
+runCheck sort files = do
     oks <- forM files $ \path ->
         onFile path $ \src ->
-            if isFormatted src
+            if formatted sort src
                 then pure True
                 else hPutStrLn stderr ("unformatted: " ++ path) >> pure False
     unless (and oks) exitFailure

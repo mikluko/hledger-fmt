@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               hledger-fmt
-version:            0.2.1.0
+version:            0.3.0.0
 synopsis:           hledger add-on: format-preserving journal formatter
 description:
     Aligns posting columns in hledger journals while touching only

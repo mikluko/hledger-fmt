@@ -11,20 +11,134 @@
 -- number is right-aligned to one shared column across all transactions.
 module Hledger.Fmt (
     format,
+    formatSorted,
     isFormatted,
+    isFormattedSorted,
 ) where
 
 import Data.Char (isDigit, isSpace)
+import Data.List (sortBy)
+import Data.Ord (comparing)
 
 -- | Format a whole file's contents. Output always ends in a newline (empty
 -- input yields empty output). Idempotent: @format (format x) == format x@.
 format :: String -> String
 format = unlines . formatLines . lines
 
+-- | Like 'format', but also stably sorts transactions by date. Sorting is
+-- directive-bounded: transactions reorder only within runs between directives
+-- and standalone comment blocks, which act as barriers, so positional
+-- directives (@Y@, @apply account@, @alias@) keep their scope. Transactions
+-- with the same date keep their source order.
+formatSorted :: String -> String
+formatSorted = unlines . formatLines . sortEntries . lines
+
 -- | Whether the input is already in formatted form (a fixed point of
 -- 'format'). Used by @--check@.
 isFormatted :: String -> Bool
 isFormatted s = format s == s
+
+-- | Whether the input is already sorted and formatted (a fixed point of
+-- 'formatSorted'). Used by @--check --sort@.
+isFormattedSorted :: String -> Bool
+isFormattedSorted s = formatSorted s == s
+
+-- ---------------------------------------------------------------------------
+-- Sorting
+-- ---------------------------------------------------------------------------
+
+-- | One chunk of the file for sorting purposes.
+data Entry
+    = -- | A single blank line (a separator; kept in place).
+      EBlank
+    | -- | A directive or standalone comment block: a barrier that transactions
+      -- are never reordered across.
+      EAnchor [String]
+    | -- | A transaction: its date key and its lines (any leading comment lines
+      -- attached above the header, the header, and its posting lines).
+      ETxn (Int, Int, Int) [String]
+
+-- | Stably sort transactions by date within each directive-bounded run, then
+-- flatten back to lines.
+sortEntries :: [String] -> [String]
+sortEntries = concatMap entryLines . sortRuns . parseEntries
+
+entryLines :: Entry -> [String]
+entryLines EBlank = [""]
+entryLines (EAnchor ls) = ls
+entryLines (ETxn _ ls) = ls
+
+-- | Split the file into entries, attaching leading comment lines to the
+-- transaction they head (a comment followed by a blank is standalone).
+parseEntries :: [String] -> [Entry]
+parseEntries = go []
+  where
+    -- pend: buffered leading comment lines awaiting the transaction they head.
+    go pend (l : ls)
+        | isBlank l = flush pend (EBlank : go [] ls)
+        | isComment l = go (pend ++ [l]) ls
+        | opensTxn l =
+            let (post, rest) = span isIndentedNonBlank ls
+             in ETxn (dateKey l) (pend ++ l : post) : go [] rest
+        | otherwise =
+            let (sub, rest) = span isIndentedNonBlank ls
+             in EAnchor (pend ++ l : sub) : go [] rest
+    go pend [] = flush pend []
+
+    flush [] cont = cont
+    flush pend cont = EAnchor pend : cont
+
+-- | A line-start comment (not indented): @;@, @#@, or @*@.
+isComment :: String -> Bool
+isComment (c : _) = c == ';' || c == '#' || c == '*'
+isComment _ = False
+
+-- | Reorder transactions within each maximal run bounded by anchors.
+sortRuns :: [Entry] -> [Entry]
+sortRuns (EAnchor a : rest) = EAnchor a : sortRuns rest
+sortRuns [] = []
+sortRuns es =
+    let (run, rest) = break isAnchor es
+     in sortRun run ++ sortRuns rest
+  where
+    isAnchor (EAnchor _) = True
+    isAnchor _ = False
+
+-- | Stably sort the transactions in a run by date, leaving blank separators in
+-- their original positions.
+sortRun :: [Entry] -> [Entry]
+sortRun run = refill run sorted
+  where
+    sorted = sortBy (comparing txnKey) [t | t@(ETxn _ _) <- run]
+    txnKey (ETxn k _) = k
+    txnKey _ = (0, 0, 0)
+    refill (ETxn _ _ : rest) (s : ss) = s : refill rest ss
+    refill (e : rest) ss = e : refill rest ss
+    refill [] _ = []
+
+-- | The sort key from a transaction header: its primary date parsed to
+-- @(year, month, day)@. Unparseable dates sort first; the stable sort then
+-- preserves their source order.
+dateKey :: String -> (Int, Int, Int)
+dateKey line =
+    case map readInt (splitOn dateSeps primary) of
+        [y, m, d] -> (y, m, d)
+        [m, d] -> (0, m, d)
+        _ -> (0, 0, 0)
+  where
+    token = takeWhile (not . isSpace) line
+    primary = takeWhile (/= '=') token -- drop any =secondary-date
+    dateSeps c = c == '/' || c == '-' || c == '.'
+
+readInt :: String -> Int
+readInt s = case reads s of
+    [(n, "")] -> n
+    _ -> 0
+
+splitOn :: (Char -> Bool) -> String -> [String]
+splitOn p s = case break p s of
+    (chunk, []) -> [chunk]
+    (chunk, _ : rest) -> chunk : splitOn p rest
 
 -- ---------------------------------------------------------------------------
 -- Line dispatch

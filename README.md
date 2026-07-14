@@ -28,12 +28,13 @@ Naming the binary `hledger-fmt` lets hledger dispatch to it as an add-on, so
 ## Usage
 
 ```
-hledger-fmt [--check] [FILE|-]...
+hledger-fmt [--check] [--sort] [FILE|-]...
 ```
 
 - `hledger-fmt FILE...` — format each file in place.
 - `hledger-fmt --check FILE...` — write nothing; exit non-zero if any file is
   not already formatted, listing offenders (for CI and pre-commit).
+- `hledger-fmt --sort FILE...` — also sort transactions by date (see below).
 - `hledger-fmt -` or no arguments — format stdin to stdout.
 
 Format every tracked journal:
@@ -81,6 +82,24 @@ as postings only when it follows a transaction header, so `account` and
 `commodity` sub-directives are left untouched.
 
 Formatting is idempotent: `hledger-fmt` on already-formatted output is a no-op.
+
+## Sorting (`--sort`)
+
+`--sort` additionally reorders transactions by date. The sort is **stable**
+(transactions with the same date keep their source order) and
+**directive-bounded**: directives (`P`, `include`, `account`, `apply account`,
+`Y`, `alias`, …) and standalone comment blocks act as barriers, and
+transactions are only reordered within the runs between them. This keeps
+positional directives (`apply account`, `Y`, `alias`) in scope. A comment line
+directly above a transaction (no blank line between) travels with it.
+
+Because `hledger print` sorts by date anyway, `--sort` still changes only what
+`print` ignores: `hledger print` output is byte-identical before and after.
+
+```sh
+hledger-fmt --sort file.journal          # align + sort in place
+hledger-fmt --check --sort file.journal  # is it aligned and sorted?
+```
 
 ## Non-goals
 
