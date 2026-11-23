@@ -22,6 +22,8 @@ cabal install hledger-fmt
 
 Or grab a prebuilt binary from the [releases page](https://github.com/mikluko/hledger-fmt/releases).
 
+With Nix, the flake's `overlays.default` adds `hledger-fmt` to nixpkgs.
+
 Naming the binary `hledger-fmt` lets hledger dispatch to it as an add-on, so
 `hledger fmt ...` works the same as `hledger-fmt ...`.
 

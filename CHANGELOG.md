@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- A Nix flake whose `overlays.default` adds `hledger-fmt`.
+
 ## 0.3.0.0 — 2026-07-08
 
 - New `--sort` flag: stably sort transactions by date. Sorting is
